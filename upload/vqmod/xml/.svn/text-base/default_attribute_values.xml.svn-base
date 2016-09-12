@@ -1,0 +1,129 @@
+<!--
+/*
+ * @support
+ * http://www.opensourcetechnologies.com/contactus.html
+ * sales@opensourcetechnologies.com
+ * */
+-->
+<modification>
+	<id>Default Attribute Values (Auto Fill Attribute Values)</id>
+	<version>1.0.1</version>
+	<vqmver>2.5.1</vqmver>
+	<author>OST</author>
+
+	<file name="admin/model/catalog/attribute.php">
+		<operation>
+			<search position="after"><![CDATA[class ModelCatalogAttribute extends Model {]]></search>
+			<add><![CDATA[
+				public function install() {
+					$sql = "SHOW COLUMNS FROM " . DB_PREFIX . "attribute_description";
+
+					$query = $this->db->query($sql);
+
+					foreach($query->rows as $column) {
+						if ($column['Field'] == 'default_value') {
+							$this->load->model('setting/setting');
+							$this->model_setting_setting->editSetting('fixed_attribute_values',array('fixed_attribute_values_installed' => true));
+							return false;
+						}
+					}
+
+					$sql = "ALTER TABLE " . DB_PREFIX . "attribute_description ADD default_value LONGTEXT";
+					$query = $this->db->query($sql);
+
+					$this->load->model('setting/setting');
+					$this->model_setting_setting->editSetting('fixed_attribute_values',array('fixed_attribute_values_installed' => true));
+				}
+			]]>
+			</add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[$attribute_data[$result['language_id']] = array('name' => $result['name']);]]></search>
+			<add><![CDATA[
+				$attribute_data[$result['language_id']] = array(
+					'name' => $result['name'],
+					'default_value' => $result['default_value']
+				);
+			]]></add>
+		</operation>
+		<operation>
+			<search position="replace"><![CDATA[name = '" . $this->db->escape($value['name']) . "']]></search>
+			<add><![CDATA[
+				name = '" . $this->db->escape($value['name']) . "', default_value = '" . $this->db->escape($value['default_value']) . "'
+			]]></add>
+		</operation>
+	</file>
+
+	<file name="admin/controller/catalog/attribute.php">
+		<operation>
+			<search position="after"><![CDATA[function index]]></search>
+			<add><![CDATA[
+				if(!$this->config->get('fixed_attribute_values_installed')) {
+					$this->load->model('catalog/attribute');
+					$this->model_catalog_attribute->install();
+				}
+			]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[function getForm]]></search>
+			<add><![CDATA[
+				$data['entry_default_values'] = $this->language->get('entry_default_values');
+			]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[$json[] = array(]]></search>
+			<add><![CDATA[
+				'default_value' => $this->model_catalog_attribute->getAttributeDescriptions($result['attribute_id']),
+			]]></add>
+		</operation>
+	</file>
+
+	<file name="admin/view/template/catalog/attribute_form.tpl">
+		<operation>
+			<search position="before" offset="1"><![CDATA[<?php echo $entry_attribute_group; ?>]]></search>
+			<add><![CDATA[
+			<div class="form-group">
+            <label class="col-sm-2 control-label" for="input-attribute-group"><?php echo $entry_default_values; ?></label>
+            <div class="col-sm-10">
+            <?php foreach ($languages as $language) { ?>
+				  <div class="input-group"><span class="input-group-addon"><img src="view/image/flags/<?php echo $language['image']; ?>" title="<?php echo $language['name']; ?>" /></span>
+					<textarea name="attribute_description[<?php echo $language['language_id']; ?>][default_value]" cols="40" rows="5" placeholder="<?php echo $entry_default_values; ?>" class="form-control" /><?php echo isset($attribute_description[$language['language_id']]) ? $attribute_description[$language['language_id']]['default_value'] : ''; ?></textarea>
+              </div>
+              <?php if (isset($error_name[$language['language_id']])) { ?>
+              <div class="text-danger"><?php echo $error_name[$language['language_id']]; ?></div>
+              <?php } ?>
+              <?php } ?>
+            </div>
+          </div>
+			]]></add>
+		</operation>
+	</file>
+
+	<file name="admin/view/template/catalog/product_form.tpl">
+		<operation>
+			<search position="after"><![CDATA[category: item.attribute_group,]]></search>
+			<add><![CDATA[
+				default_value: item.default_value,
+			]]></add>
+		</operation>
+		<operation>
+			<search position="after"><![CDATA[$('input[name=\'product_attribute[' + attribute_row + '][attribute_id]\']').val(item['value']);]]></search>
+			<add><![CDATA[
+				$.each(item['default_value'],function(key,value) {
+					$('[name=\'product_attribute[' + attribute_row + '][product_attribute_description][' + key + '][text]\']').val(value['default_value']);
+				});
+			]]></add>
+		</operation>
+	</file>
+
+
+	<file name="admin/language/english/english.php">
+		<operation>
+			<search position="before" index="1"><![CDATA[$_]]></search>
+			<add><![CDATA[
+				$_['entry_default_values'] = 'Attribute default value';
+			]]></add>
+		</operation>
+	</file>
+
+</modification>
